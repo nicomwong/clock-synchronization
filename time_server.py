@@ -5,32 +5,37 @@ import sys
 import time
 import threading
 
-IP = "127.0.0.1"    # Server's IP
-PORT = 2001 # Server's port
-
 def printConnected(address):
     timeStruct = time.gmtime(time.time() )
-    clientIP, clientPort = address
-    print(  "Server connected to (\'" + str(clientIP) + "\', " + str(clientPort) + ")\n" +
-            "second: " + str(timeStruct.tm_sec) + "\n" +
+    numSec = time.time() % 60   # for more precision
+    IP, port = address
+    print(  "Server connected to (\'" + str(IP) + "\', " + str(port) + ")\n" +
+            "second: " + str(numSec) + "\n" +
             "minute: " + str(timeStruct.tm_min) + "\n" +
             "hour: " + str(timeStruct.tm_hour) + "\n"
             )
 
 # Sends server time to client
 # Simulates propagation delay
-def sendTimeToClient():
+def sendTimeToClient(clientAddress):
             
     time.sleep(delay)   # simulate client->server propagation delay
-    serverTime = time.time()  # time since epoch (unix time)
-    printConnected(address) # print connection info
+    serverTime = time.time()    # time since epoch (unix time)
+    printConnected(clientAddress) # print connection info
     time.sleep(delay)   # simulate server->client propagation delay
     
     # send server time to client
-    sock.sendto(str(serverTime).encode(), address)
+    sock.sendto(str(serverTime).encode(), clientAddress)
 
 
-delay = 1   # for simulating propagation delay
+if len(sys.argv) != 3:
+    print("Expected 3 arguments. Exiting...")
+    sys.exit()
+
+delay = float(sys.argv[1]) # for simulating propagation delay
+PORT = int(sys.argv[2])  # Server port
+
+IP = "127.0.0.1"    # Server's IP
 
 sock = socket.socket(   socket.AF_INET, # IP
                         socket.SOCK_DGRAM  # UDP
@@ -38,8 +43,8 @@ sock = socket.socket(   socket.AF_INET, # IP
 sock.bind( (IP, PORT) )
 
 while True:
-    data, address = sock.recvfrom(1024) # Max. message size is 1024 bytes
+    data, clientAddress = sock.recvfrom(1024) # Max. message size is 1024 bytes
 
     if data == b"sync_req":
         # Spawn a new thread to handle the clock sync with client
-        threading.Thread(target = sendTimeToClient, args = () ).start()
+        threading.Thread(target = sendTimeToClient, args = (clientAddress,) ).start()

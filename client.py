@@ -7,16 +7,18 @@ import threading
 
 def printTimeAfterSync(currSimTime):
     timeStruct = time.gmtime(currSimTime)   # Get UTC struct_time
+    numSec = currSimTime % 60   # for more precision
     print(  "time after update is:\n" +
-            "second: " + str(timeStruct.tm_sec) + "\n" +
+            "second: " + str(numSec) + "\n" +
             "minute: " + str(timeStruct.tm_min) + "\n" +
             "hour: " + str(timeStruct.tm_hour) + "\n"
             )
 
 def printTimeBeforeSync(currSimTime):
     timeStruct = time.gmtime(currSimTime)   # Get UTC struct_time
+    numSec = currSimTime % 60   # for more precision
     print(  "time before update is:\n" +
-            "second: " + str(timeStruct.tm_sec) + "\n" +
+            "second: " + str(numSec) + "\n" +
             "minute: " + str(timeStruct.tm_min) + "\n" +
             "hour: " + str(timeStruct.tm_hour) + "\n"
             )
@@ -24,7 +26,7 @@ def printTimeBeforeSync(currSimTime):
 # Sends a sync query to the server and calculates the simulated time based on the response
 # Returns the new simulated time
 def syncClocks():
-    
+
     global sysTimeAfterSync, currSimTime
 
     # Update current simulated time since last sync
@@ -37,7 +39,7 @@ def syncClocks():
     sysTimeBeforeSync = time.time()
 
     # Send sync request to server
-    sock.sendto(b"sync_req", address)
+    sock.sendto(b"sync_req", serverAddress)
 
     # Receive server time message
     data, addr = sock.recvfrom(1024)
@@ -55,13 +57,16 @@ def syncClocks():
     printTimeAfterSync(currSimTime)
 
 
+if len(sys.argv) != 4:
+    print("Expected 4 arguments. Exiting...")
+    sys.exit()
+
+skew = int(sys.argv[1]) # Difference between client's and server's clock times
+drift = float(sys.argv[2])  # difference between ... clock frequencies
+PORT = int(sys.argv[3])  # Server's port
+
 IP = "127.0.0.1"    # Server's IP
-PORT = 2001 # Server's port
-
-address = (IP, PORT)    # server address
-
-skew = 2    # Difference between client's and server's clock times
-drift = 10  # difference between ... clock frequencies
+serverAddress = (IP, PORT)  # server address
 
 # Clock-sync query period
 queryPeriod = skew / (2 * drift)
@@ -74,10 +79,11 @@ sysTimeAfterSync = time.time()  # Initialize
 currSimTime = time.time() + skew    # Initialize current simulated time with skew
 printTimeAfterSync(currSimTime) # Initial output
 
-# # Run the clock-sync on a separate thread every queryPeriod seconds
-# while True:
+# Run the clock-sync on a separate thread every queryPeriod seconds
+while True:
 
-# Spawn a thread to sync clock with server
-threading.Thread(target = syncClocks).start()
-
-# time.sleep(queryPeriod)   # Sleep to maintain query frequency/period
+    # Spawn a thread to sync clock with server
+    threading.Thread(target = syncClocks).start()
+    
+    # Sleep to maintain query frequency/period
+    time.sleep(queryPeriod)
