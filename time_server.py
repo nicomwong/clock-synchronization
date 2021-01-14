@@ -13,7 +13,7 @@ def printConnected(address):
             "second: " + str(numSec) + "\n" +
             "minute: " + str(timeStruct.tm_min) + "\n" +
             "hour: " + str(timeStruct.tm_hour) + "\n"
-            )
+            , flush=True)
 
 # Sends server time to client
 # Simulates propagation delay
@@ -29,7 +29,7 @@ def sendTimeToClient(clientAddress):
 
 
 if len(sys.argv) != 3:
-    print("Expected 3 arguments. Exiting...")
+    print("Expected 3 arguments. Exiting...", flush=True)
     sys.exit()
 
 delay = float(sys.argv[1]) # for simulating propagation delay
