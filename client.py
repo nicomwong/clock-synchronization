@@ -4,25 +4,28 @@ import socket
 import sys
 import time
 import threading
+import os
+
+def printTime(currSimTime):
+    # Update current simulated time
+    # Doesn't change global value
+    currSimTime += (time.time() - sysTimeAfterSync) * (1 + drift)
+
+    timeStruct = time.gmtime(currSimTime)   # Get UTC struct_time
+    numSec = currSimTime % 60   # for more precision
+    print(  "second: " + str(numSec) + "\n" +
+            "minute: " + str(timeStruct.tm_min) + "\n" +
+            "hour: " + str(timeStruct.tm_hour) + "\n"
+            , flush=True)
 
 def printTimeAfterSync(currSimTime):
-    timeStruct = time.gmtime(currSimTime)   # Get UTC struct_time
-    numSec = currSimTime % 60   # for more precision
-    print(  "time after update is:\n" +
-            "second: " + str(numSec) + "\n" +
-            "minute: " + str(timeStruct.tm_min) + "\n" +
-            "hour: " + str(timeStruct.tm_hour) + "\n"
-            , flush=True)
+    print("time after update is:", flush=True)
+    printTime(currSimTime)
 
 def printTimeBeforeSync(currSimTime):
-    timeStruct = time.gmtime(currSimTime)   # Get UTC struct_time
-    numSec = currSimTime % 60   # for more precision
-    print(  "time before update is:\n" +
-            "second: " + str(numSec) + "\n" +
-            "minute: " + str(timeStruct.tm_min) + "\n" +
-            "hour: " + str(timeStruct.tm_hour) + "\n"
-            , flush=True)
-
+    print("time before update is:", flush=True)
+    printTime(currSimTime)
+    
 # Sends a sync query to the server and calculates the simulated time based on the response
 # Returns the new simulated time
 def syncClocks():
@@ -64,6 +67,21 @@ def runOneSyncCycle():
         print("Error: Query period is over but previous time packet has not been received. Exiting...")
         sys.exit()
 
+# Starts interactive mode to handle user input
+def interactiveUserInput():
+    while True:
+        # Valid commands are:
+        #   time: print current time
+        #   exit: exit program
+        cmd = input()
+
+        if cmd == "time":
+            printTime(currSimTime)
+
+        elif cmd == "exit":
+            print("Exiting...", flush=True)
+            os.kill(os.getpid(), 1) # Kill whole process
+
 
 if len(sys.argv) != 4:
     print("Expected 4 arguments. Exiting...", flush=True)
@@ -85,6 +103,12 @@ sock = socket.socket(   socket.AF_INET, # IP
 
 # Initialize current simulated time with skew
 currSimTime = time.time() + skew
+
+# Initialize system time after sync (initial time)
+sysTimeAfterSync = time.time()
+
+# Spawn a new thread to handle user input
+threading.Thread(target=interactiveUserInput, args=() ).start()
 
 # Run initial sync cycle
 runOneSyncCycle()
