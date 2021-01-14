@@ -12,7 +12,7 @@ def printTimeAfterSync(currSimTime):
             "second: " + str(numSec) + "\n" +
             "minute: " + str(timeStruct.tm_min) + "\n" +
             "hour: " + str(timeStruct.tm_hour) + "\n"
-            )
+            , flush=True)
 
 def printTimeBeforeSync(currSimTime):
     timeStruct = time.gmtime(currSimTime)   # Get UTC struct_time
@@ -21,19 +21,13 @@ def printTimeBeforeSync(currSimTime):
             "second: " + str(numSec) + "\n" +
             "minute: " + str(timeStruct.tm_min) + "\n" +
             "hour: " + str(timeStruct.tm_hour) + "\n"
-            )
+            , flush=True)
 
 # Sends a sync query to the server and calculates the simulated time based on the response
 # Returns the new simulated time
 def syncClocks():
 
     global sysTimeAfterSync, currSimTime
-
-    # Update current simulated time since last sync
-    currSimTime += (time.time() - sysTimeAfterSync) * (1 + drift)
-
-    # Print time before syncing
-    printTimeBeforeSync(currSimTime)
 
     # Store system time before sending sync request
     sysTimeBeforeSync = time.time()
@@ -48,17 +42,31 @@ def syncClocks():
     # Calculate simulated round-trip time
     sysTimeAfterSync = time.time() # Update system time after sync
     realRoundTripTime = sysTimeAfterSync - sysTimeBeforeSync
-    simRoundTripTime = realRoundTripTime * (1 + drift)
-    
+
     # Update global simulated time with Cristian's algorithm
-    currSimTime = serverTime + simRoundTripTime / 2
+    currSimTime = serverTime + realRoundTripTime / 2
 
     # Print time after syncing
     printTimeAfterSync(currSimTime)
 
+# Run one time-sync cycle
+def runOneSyncCycle():
+    
+    # Spawn a thread to sync clock with server
+    thread = threading.Thread(target = syncClocks, daemon = True)
+    thread.start()
+
+    # Sleep to maintain query frequency/period
+    time.sleep(queryPeriod)
+
+    # Check if thread has finished before continuing to next sync-cycle
+    if thread.is_alive():
+        print("Error: Query period is over but previous time packet has not been received. Exiting...")
+        sys.exit()
+
 
 if len(sys.argv) != 4:
-    print("Expected 4 arguments. Exiting...")
+    print("Expected 4 arguments. Exiting...", flush=True)
     sys.exit()
 
 skew = int(sys.argv[1]) # Difference between client's and server's clock times
@@ -69,21 +77,26 @@ IP = "127.0.0.1"    # Server's IP
 serverAddress = (IP, PORT)  # server address
 
 # Clock-sync query period
-queryPeriod = skew / (2 * drift)
+queryPeriod = skew / (2 * abs(drift) )
 
 sock = socket.socket(   socket.AF_INET, # IP
                         socket.SOCK_DGRAM  # UDP
                         )
 
-sysTimeAfterSync = time.time()  # Initialize
-currSimTime = time.time() + skew    # Initialize current simulated time with skew
-printTimeAfterSync(currSimTime) # Initial output
+# Initialize current simulated time with skew
+currSimTime = time.time() + skew
+
+# Run initial sync cycle
+runOneSyncCycle()
 
 # Run the clock-sync on a separate thread every queryPeriod seconds
 while True:
 
-    # Spawn a thread to sync clock with server
-    threading.Thread(target = syncClocks).start()
-    
-    # Sleep to maintain query frequency/period
-    time.sleep(queryPeriod)
+    # Update current simulated time since last sync
+    currSimTime += (time.time() - sysTimeAfterSync) * (1 + drift)
+
+    # Print time before syncing
+    printTimeBeforeSync(currSimTime)
+
+    # Run one sync cycle
+    runOneSyncCycle()
